@@ -1,42 +1,9 @@
-"""
-sis_model.py
-------------
-Core implementation of the SIS epidemic model on complex networks.
-
-Contains:
-  - sis_step()           : one synchronous time step of the SIS dynamics (reference, readable)
-  - sis_step_fast()      : vectorised version using sparse matrix (x30 faster, used in practice)
-  - run_simulation()     : full Monte Carlo run for a single (network, beta, mu)
-  - simulate_epidemic()  : sweeps over beta values and returns <rho>(beta)
-"""
-
 import numpy as np
 import networkx as nx
 from scipy.sparse import csr_array
 
-
-# ── Single time step (readable reference implementation) ──────────────────────
-
+"""
 def sis_step(states, adjacency_list, beta, mu, rng):
-    """
-    Performs one synchronous time step of the SIS dynamics.
-
-    Parameters
-    ----------
-    states         : np.ndarray of int, shape (N,)
-                     Current state of each node: 0 = Susceptible, 1 = Infected
-    adjacency_list : list of np.ndarray
-                     adjacency_list[i] contains the indices of node i's neighbors
-    beta           : float
-                     Infection probability per infected neighbor contact
-    mu             : float
-                     Spontaneous recovery probability
-    rng            : np.random.Generator
-
-    Returns
-    -------
-    new_states : np.ndarray of int, shape (N,)
-    """
     N = len(states)
     new_states = states.copy()
 
@@ -55,9 +22,7 @@ def sis_step(states, adjacency_list, beta, mu, rng):
                     break  # stop as soon as infected
 
     return new_states
-
-
-# ── Vectorised time step (fast, used in all simulations) ──────────────────────
+"""
 
 def sis_step_fast(states, A_csr, beta, mu, rng):
     """
@@ -101,36 +66,11 @@ def sis_step_fast(states, A_csr, beta, mu, rng):
     return new_states
 
 
-# ── Helper: build sparse adjacency matrix ─────────────────────────────────────
-
 def build_sparse_adj(G):
-    """Returns scipy CSR sparse adjacency matrix."""
     return nx.to_scipy_sparse_array(G, format="csr", dtype=np.float64)
 
 
-# ── Single Monte Carlo run ────────────────────────────────────────────────────
-
 def run_simulation(G, beta, mu, rho0=0.05, Tmax=1000, Ttrans=900, seed=None):
-    """
-    Runs one Monte Carlo realization of the SIS model on graph G.
-
-    Parameters
-    ----------
-    G      : networkx.Graph  (nodes must be 0..N-1)
-    beta   : float  – infection probability per contact
-    mu     : float  – spontaneous recovery probability
-    rho0   : float  – initial fraction of infected nodes (default 0.05 → 50/1000)
-    Tmax   : int    – total number of time steps
-    Ttrans : int    – transient steps to discard before averaging
-    seed   : int or None
-
-    Returns
-    -------
-    rho_mean : float
-               Average fraction of infected nodes over [Ttrans, Tmax)
-    rho_t    : np.ndarray, shape (Tmax,)
-               Full rho(t) time series (useful for checking transient)
-    """
     rng = np.random.default_rng(seed)
     N = G.number_of_nodes()
     A = build_sparse_adj(G)
@@ -149,34 +89,9 @@ def run_simulation(G, beta, mu, rho0=0.05, Tmax=1000, Ttrans=900, seed=None):
     return rho_mean, rho_t
 
 
-# ── Monte Carlo epidemic diagram ──────────────────────────────────────────────
-
 def simulate_epidemic(G, beta_values, mu,
                       rho0=0.05, Tmax=1000, Ttrans=900,
                       Nrep=100, seed=None, verbose=True):
-    """
-    Computes <rho>(beta) by Monte Carlo for a sweep of beta values.
-
-    For each beta, runs Nrep independent repetitions and averages rho over the
-    stationary window [Ttrans, Tmax) of each repetition.
-
-    Parameters
-    ----------
-    G           : networkx.Graph
-    beta_values : array-like of floats
-    mu          : float
-    rho0        : float  – initial fraction of infected nodes
-    Tmax        : int
-    Ttrans      : int
-    Nrep        : int    – number of independent repetitions per beta value
-    seed        : int or None
-    verbose     : bool
-
-    Returns
-    -------
-    rho_mean : np.ndarray, shape (len(beta_values),)
-    rho_std  : np.ndarray, shape (len(beta_values),)
-    """
     rng = np.random.default_rng(seed)
     beta_values = np.asarray(beta_values)
     rho_mean = np.zeros(len(beta_values))
